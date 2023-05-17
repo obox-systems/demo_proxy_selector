@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{mysql::MySqlRow, Row};
 
-/// Custom error type 
+/// Custom error type
 #[derive(Debug)]
 pub enum PFError {
   /// DB connection missing.
@@ -11,7 +11,7 @@ pub enum PFError {
   /// Elasticsearch related error.
   Elastic(elasticsearch::Error),
   /// MySQL related error.
-  MySql(sqlx::Error)
+  MySql(sqlx::Error),
 }
 
 impl From<elasticsearch::Error> for PFError {
@@ -34,15 +34,15 @@ pub enum Plan {
   /// Cheap subscription.
   Basic,
   /// Full access subscription.
-  Premium
-} 
+  Premium,
+}
 
 impl From<&str> for Plan {
   fn from(value: &str) -> Self {
     match value {
       "Basic" => Self::Basic,
       "Premium" => Self::Premium,
-      _ => Self::Free
+      _ => Self::Free,
     }
   }
 }
@@ -57,7 +57,7 @@ pub struct User {
   /// Last used proxy.
   pub last_proxy: Option<Proxy>,
   /// Subscription plan.
-  pub plan: Plan
+  pub plan: Plan,
 }
 
 impl From<MySqlRow> for User {
@@ -66,7 +66,7 @@ impl From<MySqlRow> for User {
       email: value.get(0),
       country: value.get(1),
       last_proxy: serde_json::from_str(value.get(1)).ok(),
-      plan: (value.get::<&str, usize>(3)).into()
+      plan: (value.get::<&str, usize>(3)).into(),
     }
   }
 }
@@ -80,6 +80,6 @@ pub struct Proxy {
   pub country: String,
   /// Latency from the user.
   pub latency: u16,
-  /// Minimum subscription plan. 
-  pub plan: Plan
+  /// Minimum subscription plan.
+  pub plan: Plan,
 }
