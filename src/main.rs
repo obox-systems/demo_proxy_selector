@@ -13,5 +13,5 @@ async fn main() {
   dbg!(&user);
   let proxy = selector.get_proxy(&user).await.unwrap();
   dbg!(proxy);
-  selector.update_user_proxy(&user, &proxy).await.unwrap();
+  selector.update_user_proxy(&user, proxy).await.unwrap();
 }

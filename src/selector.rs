@@ -3,6 +3,7 @@ use serde_json::json;
 use sqlx::{MySqlPool, mysql::MySqlArguments, Arguments};
 use crate::types::{User, PFError, Proxy, Plan};
 
+#[derive(Debug)]
 struct DBConnector {
   elastic: Option<Elasticsearch>,
   mysql: Option<MySqlPool>,
@@ -42,9 +43,10 @@ FROM users
       let proxy = serde_json::to_string(&proxy).unwrap();
       let mut args = MySqlArguments::default();
       args.add(proxy);
+      args.add(email);
       sqlx::query_with(
          r#"
-UPDATE users SET last_proxy = ?
+UPDATE users SET last_proxy = ? WHERE email = ?
         "#,
         args
       ).execute(mysql)
@@ -73,16 +75,20 @@ impl From<MySqlPool> for DBConnector {
   }
 }
 
+/// Selector class holds connections to DBs and list of proxies. 
+#[derive(Debug, Default)]
 pub struct ProxySelector {
   connectors: Vec<DBConnector>,
   proxy_list: Vec<Proxy>
 }
 
 impl ProxySelector {
+  /// Creates new selector object.
   pub fn new() -> Self {
     Self { connectors: vec![], proxy_list: vec![] }
   }
 
+  /// Add Elasticsearch to data sources. 
   pub async fn add_elastic(&mut self, url: &str) -> Result<(), elasticsearch::Error> {
     let transport = Transport::single_node(url)?;
     let client = Elasticsearch::new(transport);
@@ -90,16 +96,19 @@ impl ProxySelector {
     Ok(())
   }
 
+  /// Add MySQL to data sources.
   pub async fn add_mysql(&mut self, url: &str) -> Result<(), sqlx::Error> {
     let pool = MySqlPool::connect(url).await?;
     self.connectors.push(pool.into());
     Ok(())
   }
 
+  /// Add custom proxy locally.
   pub fn add_proxy<S: Into<String>>(&mut self, addr: S, plan: Plan) {
-    self.proxy_list.push(Proxy { addr: addr.into(), country: "UA".into(), latency: 100, plan: plan })
+    self.proxy_list.push(Proxy { addr: addr.into(), country: "UA".into(), latency: 100, plan })
   }
 
+  /// Get user entity by email.
   pub async fn get_user(&self, email: &str) -> Result<User, PFError> {
     for connector in self.connectors.iter() {
       match connector.get_user(email).await {
@@ -111,6 +120,7 @@ impl ProxySelector {
     Err(PFError::NoDB)
   }
 
+  /// Get appropriate proxy for specific user.
   pub async fn get_proxy(&self, user: &User) -> Result<&Proxy, PFError> {
     let proxy = self.proxy_list.iter()
       .filter(|proxy| proxy.plan == user.plan)
@@ -127,6 +137,7 @@ impl ProxySelector {
     Err(PFError::NotFound)
   }
 
+  /// Update last used proxy for a user.
   pub async fn update_user_proxy(&self, user: &User, proxy: &Proxy) -> Result<(), PFError> {
     for connector in self.connectors.iter() {
       connector.update_proxy(&user.email, proxy).await?;
